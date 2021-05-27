@@ -1,0 +1,1 @@
+get-aduser -properties * -filter * | where-object {$_.enabled -eq $true} | select name, samaccountname , officephone , mobilephone , | export-csv
