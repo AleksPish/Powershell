@@ -6,8 +6,7 @@
   Scripts for tasks
 
  .Example
-   # Highlight a range of days.
-   Show-Calendar -HighlightDay (1..10 + 22) -HighlightDate "December 25, 2008"
+   You don't need any examples
 #>
 
 
@@ -44,10 +43,6 @@ New-Alias -Name adfsmo -Value Get-ADFSMO -Description "Show server hosting AD FS
 
 function Remove-WinUpdateDistFolder {
     Stop-Service -Name wuauserv
-    Get-Service -Name wuauserv
-    Write-Host "If Service has not stopped exit script with ctrl+c and then run as admin"
-    
-    Pause
     for ($i=0; $i -lt 24; $i++){
     if ($i -lt 24){
     $timer = @("/","-","\","|")
@@ -56,11 +51,39 @@ function Remove-WinUpdateDistFolder {
         Clear-Host      
         }
     }
+    Get-Service -Name wuauserv
+    Write-Host "If Service has not stopped exit script with ctrl+c and then run as admin"
+    
+    Pause
+    
     Remove-Item -Path C:\Windows\SoftwareDistribution\* -Confirm -Force -Recurse 
     
 }
-
 New-Alias -Name delupdates -Value Remove-WinUpdateDistFolder -Description "Stop windows update service and deletes contents of software distribution folder"
+
+function DeleteActiveX {
+    $Count = 0
+    $Files = Get-ChildItem $env:userprofile -filter *noActiveX* -Recurse 
+    ForEach  ($File in $Files) {
+        $Count++
+        Remove-item $File
+    }
+    Write-host $Count" files deleted"
+}
+
+function DeleteISLlight {
+    $Count = 0
+    $Files = Get-ChildItem $env:userprofile -filter *"ISL Light"* -Recurse 
+    ForEach  ($File in $Files) {
+        $Count++
+        Remove-item $File
+    }
+    Write-host $Count" files deleted"
+}
+
+function Update-Powershell {
+    Invoke-Expression "& { $(Invoke-RestMethod https://aka.ms/install-powershell.ps1) } -UseMSI"
+}
 
 function Wait-Computer
 {
