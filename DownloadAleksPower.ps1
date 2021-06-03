@@ -1,0 +1,1 @@
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/AleksPish/Powershell/master/PowershellModules/AleksPower.psm1 -UseBasicParsing -OutFile $env:userprofile\Documents\PowerShell\Modules\AleksPower\AleksPower.psm1
