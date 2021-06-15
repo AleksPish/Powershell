@@ -112,11 +112,16 @@ function Get-SimpleFoldersizes {
         $userProfilePath = $env:userprofile
         $test = Test-Path  -Path $env:userprofile\Documents\PowerShell\Modules\AleksPower
         if ($test -eq $false){
+            Write-Host -ForegroundColor Yellow "Creating Folder"
             New-Item -Path $env:userprofile\Documents\PowerShell\Modules\AleksPower -ItemType Directory
+            Write-Host -ForegroundColor Yellow "Downloading"
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/AleksPish/Powershell/master/PowershellModules/AleksPower.psm1 -UseBasicParsing -OutFile $userProfilePath\Documents\PowerShell\Modules\AleksPower\AleksPower.psm1
+            Write-Host -ForegroundColor Green "Complete"
         }
         else {
+        Write-Host -ForegroundColor Yellow "Downloading"
         Invoke-WebRequest -Uri https://raw.githubusercontent.com/AleksPish/Powershell/master/PowershellModules/AleksPower.psm1 -UseBasicParsing -OutFile $userProfilePath\Documents\PowerShell\Modules\AleksPower\AleksPower.psm1
-        }
+        Write-Host -ForegroundColor Green "Complete"
+    }
     }
 Export-ModuleMember -alias * -Function *
