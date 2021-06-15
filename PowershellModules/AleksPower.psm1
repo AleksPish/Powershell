@@ -92,5 +92,31 @@ function Wait-Computer
   [System.Windows.Forms.Application]::SetSuspendState($state, $false, $false) | Out-Null
 }
 
+function Get-SimpleFoldersizes {
+    
+    # Get the folders and sort  
+    $Folders = (Get-ChildItem | Where-Object {$_.PSIsContainer -eq $True} | Sort-Object)
+    
+    #Get info on each folder and input to PSobject
+    foreach ($i in $Folders)
+        {
+            $subFolderItems = (Get-ChildItem $i.FullName -recurse | Measure-Object -property length -sum)
+            $size = ($subFolderItems.sum / 1MB)
+             
+            Write-host $i.Name , $size
+        }  
+    }
 
+
+    function Get-AleksPower {
+        $userProfilePath = $env:userprofile
+        $test = Test-Path  -Path $env:userprofile\Documents\PowerShell\Modules\AleksPower
+        if ($test -eq $false){
+            New-Item -Path $env:userprofile\Documents\PowerShell\Modules\AleksPower -ItemType Directory
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/AleksPish/Powershell/master/PowershellModules/AleksPower.psm1 -UseBasicParsing -OutFile $userProfilePath\Documents\PowerShell\Modules\AleksPower\AleksPower.psm1
+        }
+        else {
+        Invoke-WebRequest -Uri https://raw.githubusercontent.com/AleksPish/Powershell/master/PowershellModules/AleksPower.psm1 -UseBasicParsing -OutFile $userProfilePath\Documents\PowerShell\Modules\AleksPower\AleksPower.psm1
+        }
+    }
 Export-ModuleMember -alias * -Function *
