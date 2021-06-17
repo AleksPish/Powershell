@@ -68,7 +68,7 @@ function DeleteActiveX {
         $Count++
         Remove-item $File -ErrorAction SilentlyContinue
     }
-    Write-host $Count" files deleted"
+    Write-host -ForegroundColor Green $Count" files deleted"
 }
 
 function DeleteISLlight {
