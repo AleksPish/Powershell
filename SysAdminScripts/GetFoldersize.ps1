@@ -15,10 +15,10 @@ $Folders = (Get-ChildItem $TargetFolder | Where-Object {$_.PSIsContainer -eq $Tr
 foreach ($i in $Folders)
     {
         $subFolderItems = (Get-ChildItem $i.FullName -recurse | Measure-Object -property length -sum)
-        $size = ($subFolderItems.sum / 1MB)
+        $size = '{0:N0}'-f ($subFolderItems.sum / 1MB)
             
             $output = New-Object PSObject -Property @{
-            Size = $size
+            "Size MB" = $size
             Foldername = $i.Name
             }
         # Append info in PSobject to csv file on each loop
