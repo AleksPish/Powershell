@@ -6,7 +6,7 @@ function Get-MatchingString {
         [string]$Path, 
         # Searching for
         [Parameter(Mandatory=$true)]
-        [string]$Text,
+        [string]$Match,
         #Output location
         [Parameter(Mandatory=$true)]
         [string]$Output
@@ -22,7 +22,7 @@ Get-ChildItem $Path -Include "*.bat", "*.vbs", "*.cmd","*.txt" -Recurse | Where-
 
 #Loops through objects for matches and puts matches into the patharray array
 ForEach-Object {
-    If (Get-Content $_.FullName | Select-String -Pattern $Text) {
+    If (Get-Content $_.FullName | Select-String -Pattern $Match) {
     $PathArray += $_.FullName
     }
 }
