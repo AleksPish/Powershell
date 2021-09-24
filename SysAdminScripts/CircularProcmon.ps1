@@ -1,5 +1,5 @@
 
-Start-job{
+$Compressjob =  Start-job{
     $h = 1
     Do {
         $pml = Get-ChildItem  -path F:\Procmon\Archive -filter *.pml
@@ -12,10 +12,12 @@ Start-job{
         Start-sleep 10
     }while($h = 1)
 }
-    
-Start-job {
+ Write-host "Starting compress job"
+Start-Sleep 3 
+Write-host $Compressjob.State  
+$MonitorJob = Start-job {
     $LogPath="F:\Procmon"
-    $MaxLogs=5
+    $MaxLogs=30
     $Counter = 0
     
     
@@ -42,11 +44,35 @@ Start-job {
 
         # Terminate ProcMon
         start-process $LogPath\Procmon64.exe /Terminate
-        Start-Sleep 5
+        Start-Sleep 6
     
         Move-Item $Logfile F:\procmon\archive
+        $Splitlogfiles = Get-ChildItem F:\Procmon -filter *.pml
+        Foreach ($s in $Splitlogfiles){
+        mv $s.FullName F:\Procmon\Archive
+
+        }
       
     }while ($Counter -le $MaxLogs)
 }
-    
-    
+Write-host "Starting monitor job"
+Start-Sleep 3
+write-host $MonitorJob.State
+Do {
+Write-host "Press Any Key to Stop Monitoring"
+
+if($host.UI.RawUI.ReadKey()){
+$LogPath="F:\Procmon"
+Get-Job | Stop-Job
+Write-host "Stopping Jobs"
+Start-sleep 15
+Get-Job | Remove-Job
+Write-host "Removing Jobs"
+Write-host "Stopping Procmon"
+start-process $LogPath\Procmon64.exe /Terminate
+
+$Compressjob.State
+$Monitorjob.State
+} 
+
+}While ($Compressjob.State -eq "Running")
