@@ -3,9 +3,9 @@ Param (
     [int32]$Count = 1,
     
     [Parameter(ValueFromPipeline=$true)]
-    [String[]]$Computer = "192.168.0.12",
+    [String[]]$Computer = "1.1.1.1",
     
-    [string]$LogPath = "c:\pinglog\Laptoppingtest.csv"
+    [string]$LogPath = "c:\temp\Laptoppingtest.csv"
 )
 
 $Ping = @()
@@ -24,6 +24,7 @@ If (-not (Test-Path $LogPath))
 #Log collection loop
 Write-Verbose "Beginning Ping monitoring of $Comptuer for $Count tries:"
 While ($Count -gt 0)
+
 {   $Ping = Get-WmiObject Win32_PingStatus -Filter "Address = '$Computer'" | Select @{Label="TimeStamp";Expression={Get-Date}},@{Label="Source";Expression={ $_.__Server }},@{Label="Destination";Expression={ $_.Address }},IPv4Address,@{Label="Status";Expression={ If ($_.StatusCode -ne 0) {"Failed"} Else {""}}},ResponseTime
     $Result = $Ping | Select TimeStamp,Source,Destination,IPv4Address,Status,ResponseTime | ConvertTo-Csv -NoTypeInformation
     $Result[1] | Add-Content -Path $LogPath
