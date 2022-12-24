@@ -1,0 +1,20 @@
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+# Create a new form with a label for the message
+$form = New-Object System.Windows.Forms.Form
+$label = New-Object System.Windows.Forms.Label
+
+# Set the message and colors for the label
+$label.Text = "Don't panic!"
+$label.ForeColor = 'Red'
+$label.BackColor = 'Yellow'
+
+# Add the label to the form and set its properties
+$form.Controls.Add($label)
+$form.TopMost = $true
+$form.Width = 200
+$form.Height = 100
+
+# Show the form on the desktop
+$form.ShowDialog()
