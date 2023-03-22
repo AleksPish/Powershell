@@ -124,4 +124,25 @@ function Get-SimpleFoldersizes {
         Write-Host -ForegroundColor Green "Complete"
     }
     }
+
+    function Enter-Task {
+        param (
+            $entry
+        )
+        $date = (get-date).ToLongDateString()
+        $fileCheck = test-path "$env:USERPROFILE\Documents\Tasks\$date.txt"
+        $file = "$env:USERPROFILE\Documents\Tasks\$date.txt"
+        if ($false -eq $fileCheck){
+            New-Item -ItemType "File" -Path "$env:USERPROFILE\Documents\Tasks\$date.txt"
+        }
+        $timestamp = (Get-date).TimeOfDay
+    
+        $output = $entry
+    
+        $output += "    $timestamp"
+        $output | Out-file  -Append -Path $file
+    }
+
+New-Alias -Name et -Value Enter-Task -Description "Enter a string or comment into a text file for recording tasks or notes with a timestamp"
+
 Export-ModuleMember -alias * -Function *

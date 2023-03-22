@@ -1,4 +1,4 @@
-#Run on the server the AD connector is installed to enable th epassword hash sync
+#Run on the server the AD connector is installed to enable the password hash sync
 
 $adConnector = "<CASE SENSITIVE AD DS CONNECTOR NAME>"
 
