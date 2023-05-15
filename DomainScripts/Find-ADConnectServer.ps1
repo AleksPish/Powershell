@@ -1,0 +1,1 @@
+Get-ADUser -LDAPFilter "(description=*configured to synchronize to tenant*)" -Properties description | % { $_.description.SubString(142, $_.description.IndexOf(" ", 142) -142)}
