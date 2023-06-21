@@ -131,14 +131,11 @@ function Get-SimpleFoldersizes {
             [string]$update
         )
         $date = (get-date).ToLongDateString()
-        
         $fileCheck = test-path "$env:USERPROFILE\Documents\Tasks\$date.csv"
         $file = "$env:USERPROFILE\Documents\Tasks\$date.csv"
         if ($false -eq $fileCheck){
             New-Item -ItemType "File" -Path "$env:USERPROFILE\Documents\Tasks\$date.csv"
         }
-        $timestamp = (Get-Date -Format HH:mm:ss)
-
         if([String]::IsNullOrWhiteSpace((Get-content $file))) {
             $lastTaskTime = (Get-Date -Format HH:mm:ss)
             $header = "ID,Note,Minutes,Time"
@@ -150,14 +147,14 @@ function Get-SimpleFoldersizes {
             $lastTaskTimeEntry = $lastTaskEntry.PSObject.Properties.Name[-1]
             $lastTaskTime = $lastTaskEntry.$lastTaskTimeEntry
         }
-        
+        $timestamp = (Get-Date -Format HH:mm:ss)
         $timeTaken = New-Timespan -Start $lastTaskTime -End $timestamp 
         $timeTakenInMinutes = [Math]::Round($timeTaken.TotalMinutes)
         $output = [string]$id += ",$update"
         $output += ",$timeTakenInMinutes,$timestamp"
-
         $output | Out-file  -Append -Path $file
     }
+    
 
 New-Alias -Name et -Value Enter-Task -Description "Enter a string or comment into a text file for recording tasks or notes with a timestamp"
 
