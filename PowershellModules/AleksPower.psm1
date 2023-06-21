@@ -127,19 +127,35 @@ function Get-SimpleFoldersizes {
 
     function Enter-Task {
         param (
-            $entry
+            [string]$id,
+            [string]$update
         )
         $date = (get-date).ToLongDateString()
-        $fileCheck = test-path "$env:USERPROFILE\Documents\Tasks\$date.txt"
-        $file = "$env:USERPROFILE\Documents\Tasks\$date.txt"
+        
+        $fileCheck = test-path "$env:USERPROFILE\Documents\Tasks\$date.csv"
+        $file = "$env:USERPROFILE\Documents\Tasks\$date.csv"
         if ($false -eq $fileCheck){
-            New-Item -ItemType "File" -Path "$env:USERPROFILE\Documents\Tasks\$date.txt"
+            New-Item -ItemType "File" -Path "$env:USERPROFILE\Documents\Tasks\$date.csv"
         }
-        $timestamp = (Get-date).TimeOfDay
-    
-        $output = $entry
-    
-        $output += "    $timestamp"
+        $timestamp = (Get-Date -Format HH:mm:ss)
+
+        if([String]::IsNullOrWhiteSpace((Get-content $file))) {
+            $lastTaskTime = (Get-Date -Format HH:mm:ss)
+            $header = "ID,Note,Minutes,Time"
+            $header | out-file -path $file -append
+        }
+        else {
+            $lastTaskFile = Import-Csv $file 
+            $lastTaskEntry = $lastTaskFile[$lastTaskFile.Count -1]
+            $lastTaskTimeEntry = $lastTaskEntry.PSObject.Properties.Name[-1]
+            $lastTaskTime = $lastTaskEntry.$lastTaskTimeEntry
+        }
+        
+        $timeTaken = New-Timespan -Start $lastTaskTime -End $timestamp 
+        $timeTakenInMinutes = [Math]::Round($timeTaken.TotalMinutes)
+        $output = [string]$id += ",$update"
+        $output += ",$timeTakenInMinutes,$timestamp"
+
         $output | Out-file  -Append -Path $file
     }
 
