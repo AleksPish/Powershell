@@ -23,8 +23,7 @@ function Enter-Task {
     $timestamp = (Get-Date -Format HH:mm:ss)
     $timeTaken = New-Timespan -Start $lastTaskTime -End $timestamp 
     $timeTakenInMinutes = [Math]::Round($timeTaken.TotalMinutes)
-    $output = [string]$id += ",$update"
-    $output += ",$timeTakenInMinutes,$timestamp"
+    $output = "$id,$update,$timeTakenInMinutes,$timestamp"
     $output | Out-file  -Append -Path $file
 }
 
