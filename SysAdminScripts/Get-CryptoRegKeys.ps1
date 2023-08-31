@@ -1,3 +1,14 @@
+#######################################
+#/-----------------------------------\#
+#|Aleks Piszczynski - piszczynski.com|#
+#\-----------------------------------/#
+#######################################
+<#
+.Synopsis
+   Script to get Registry Keys from all domain servers and return the results. 
+.DESCRIPTION
+   Script looks at reg keys for TLS and .NET to ensure you can identify any servers that are not compatible with secure crypto settings. Two versions are availble - comment out depending if using powershell 5 or lower. 
+#>
 
 <#
 $servers = (Get-ADComputer -Properties operatingsystem `
