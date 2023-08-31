@@ -1,3 +1,13 @@
+#######################################
+#/-----------------------------------\#
+#|Aleks Piszczynski - piszczynski.com|#
+#\-----------------------------------/#
+#######################################
+<#
+.Synopsis
+   Script taken from Citrix Documentation to complete move of citrix databases
+#>
+
 #Reset database connections
 
 ## Disable configuration logging for the XD site:

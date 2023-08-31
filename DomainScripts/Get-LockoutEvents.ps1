@@ -1,3 +1,13 @@
+#######################################
+#/-----------------------------------\#
+#|Aleks Piszczynski - piszczynski.com|#
+#\-----------------------------------/#
+#######################################
+<#
+.Synopsis
+   Get the lockout events for a user
+#>
+
 Import-Module ActiveDirectory
 $UserName = Read-Host "Please enter username"
 #Get main DC
@@ -9,7 +19,7 @@ $LockedOutEvents = Get-WinEvent -ComputerName $PDC.HostName -FilterHashtable @{L
 #Parse and filter out lockout events
 Foreach($Event in $LockedOutEvents)
  {
- If($Event | Where {$_.Properties[2].value -match $UserInfo.SID.Value})
+ If($Event | Where-Object {$_.Properties[2].value -match $UserInfo.SID.Value})
  {
  
  $Event | Select-Object -Property @(

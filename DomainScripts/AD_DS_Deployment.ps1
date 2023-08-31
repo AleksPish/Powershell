@@ -1,6 +1,12 @@
-#
-# Windows PowerShell script for AD DS Deployment
-#
+#######################################
+#/-----------------------------------\#
+#|Aleks Piszczynski - piszczynski.com|#
+#\-----------------------------------/#
+#######################################
+<#
+.Synopsis
+    Example script to deploy a new Domain
+#>
 
 Import-Module ADDSDeployment
 Install-ADDSForest `
