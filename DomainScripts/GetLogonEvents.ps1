@@ -1,3 +1,13 @@
+#######################################
+#/-----------------------------------\#
+#|Aleks Piszczynski - piszczynski.com|#
+#\-----------------------------------/#
+#######################################
+<#
+.Synopsis
+   Find logon events
+#>
+
 # Find DC list from Active Directory
 $DCs = Get-ADDomainController -Filter *
  
@@ -6,7 +16,7 @@ $startDate = (get-date).AddDays(-1)
  
 # Store successful logon events from security logs with the specified dates and workstation/IP in an array
 foreach ($DC in $DCs){
-$slogonevents = Get-Eventlog -LogName Security -ComputerName $DC.Hostname -after $startDate | where {$_.eventID -eq 4624 }}
+$slogonevents = Get-Eventlog -LogName Security -ComputerName $DC.Hostname -after $startDate | Where-Object {$_.eventID -eq 4624 }}
  
 # Crawl through events; print all logon history with type, date/time, status, account name, computer and IP address if user logged on remotely
  

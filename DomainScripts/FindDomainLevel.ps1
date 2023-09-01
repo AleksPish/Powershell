@@ -1,3 +1,16 @@
+#######################################
+#/-----------------------------------\#
+#|Aleks Piszczynski - piszczynski.com|#
+#\-----------------------------------/#
+#######################################
+<#
+.Synopsis
+   Find the Domain Functional Level of the domain
+#>
+
+function FindDomainLevel {
+   
+
 $dse = ([ADSI] "LDAP://RootDSE")
 
 Write-host "Domain controller Level"
@@ -22,3 +35,6 @@ Value  Forest        Domain             Domain Controller
 5      2012          2012               2012
 6      2012 R2       2012 R2            2012 R2
 7      2016          2016               2016"
+}
+
+FindDomainLevel

@@ -1,3 +1,13 @@
+#######################################
+#/-----------------------------------\#
+#|Aleks Piszczynski - piszczynski.com|#
+#\-----------------------------------/#
+#######################################
+<#
+.Synopsis
+   Function to download the AleksPower powershell module and place in user powershell modules folder
+#>
+
 function Get-AleksPower {
     $userProfilePath = $env:userprofile
     $test = Test-Path  -Path $env:userprofile\Documents\PowerShell\Modules\AleksPower

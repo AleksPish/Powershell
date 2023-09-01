@@ -1,3 +1,13 @@
+#######################################
+#/-----------------------------------\#
+#|Aleks Piszczynski - piszczynski.com|#
+#\-----------------------------------/#
+#######################################
+<#
+.Synopsis
+   Get FSMO roles of domain controllers
+#>
+
 function Get-ADFSMORole {
     [CmdletBinding()]
     param()
@@ -7,3 +17,4 @@ function Get-ADFSMORole {
     $roles += Get-ADForest | Select-Object DomainNamingMaster,SchemaMaster
     $roles | Format-List 
 }
+Get-ADFSMORole
