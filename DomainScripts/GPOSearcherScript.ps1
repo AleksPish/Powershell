@@ -1,6 +1,5 @@
 
 # Get the string we want to search for 
-
 $string = Read-Host -Prompt "What string do you want to search for?" 
 
 # Set the domain to search for GPOs 
