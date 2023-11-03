@@ -5,6 +5,12 @@
 #######################################
 <#
 .Synopsis
-    Get Phone numbers from All AD Users
+   Get All Domain Controllers
 #>
-Get-ADuser -properties * -filter * | Where-Object {$_.enabled -eq $true} | Select-Object name, samaccountname , officephone , mobilephone | export-csv
+
+function Get-DomainControllers {
+    
+    $domain = (get-addomain).DNSRoot
+    $dcs = get-addomaincontroller -Filter * -Server $domain | Select-Object Hostname
+    $dcs
+}

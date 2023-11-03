@@ -5,6 +5,11 @@
 #######################################
 <#
 .Synopsis
-    Get Phone numbers from All AD Users
+   Short description
+.DESCRIPTION
+   Long description
+.EXAMPLE
+   Example of how to use this cmdlet
+.EXAMPLE
+   Another example of how to use this cmdlet
 #>
-Get-ADuser -properties * -filter * | Where-Object {$_.enabled -eq $true} | Select-Object name, samaccountname , officephone , mobilephone | export-csv
