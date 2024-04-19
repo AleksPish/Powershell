@@ -1,4 +1,4 @@
-#Add vairables for the WAF
+#Add vairables for the WAF:
 
 $rgname = "<resource group containing the WAF>"
 $location = "<location eg westeurope>"
