@@ -34,7 +34,9 @@ foreach($Server in $Servers)
             
             $Object | Export-CSV -Path C:\temp\results.csv -Append -NoTypeInformation
 
-            Write-host $Object
+            if($null -ne $object ){
+                Write-host $Object
+                }
         }
     } 
     Else
