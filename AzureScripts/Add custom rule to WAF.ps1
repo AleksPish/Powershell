@@ -3,7 +3,7 @@
 $rgname = "<resource group containing the WAF>"
 $location = "<location eg westeurope>"
 
-#Create noew policy on WAF to block specifi IP address:
+#Create noew policy on WAF to block specific IP address:
 
 $variable1 = New-AzApplicationGatewayFirewallMatchVariable -VariableName RemoteAddr
 
