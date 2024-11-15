@@ -14,16 +14,18 @@ function Get-ListeningProcesses {
 
     $portinfo = @()
 
-    $listenports | ForEach-Object {$localport = $_.LocalPort ;
+    $listenports | ForEach-Object {
+        $localport = $_.LocalPort
 
-        $processname = Get-process -id $_.OwningProcess;
+        $processname = Get-process -id $_.OwningProcess
 
         $portdetails = [PSCustomObject]@{
-        LocalPort = $localport
-        ProcessName = $processname.ProcessName
-    }
-    $portdetails
-    $portinfo += $portdetails
+            LocalPort = $localport
+            ProcessName = $processname.ProcessName
+        }
+        
+        $portdetails
+        $portinfo += $portdetails
     }
     $portinfo
 }
