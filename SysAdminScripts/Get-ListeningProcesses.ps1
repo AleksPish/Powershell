@@ -28,4 +28,4 @@ function Get-ListeningProcesses {
     $portinfo
 }
 $export = Get-ListeningProcesses
-$export | Export-Csv "C:\Temp\$env:COMPUTERNAME ListeningPorts.csv"
+$export | Export-Csv "C:\Temp\$env:COMPUTERNAME ListeningPorts.csv" -NoTypeInformation
