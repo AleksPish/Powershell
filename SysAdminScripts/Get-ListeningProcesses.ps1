@@ -10,7 +10,7 @@
 
 function Get-ListeningProcesses {
 
-    $listenports = Get-NetTCPConnection | Where-Object {$_.state -eq "Listen"}
+    $listenports = Get-NetTCPConnection | Where-Object {($_.state -eq "Listen") -and ($_.LocalAddress -eq "0.0.0.0") -and ($_.RemoteAddress -eq "0.0.0.0")}
 
     $portinfo = @()
 
@@ -23,7 +23,7 @@ function Get-ListeningProcesses {
             LocalPort = $localport
             ProcessName = $processname.ProcessName
         }
-        
+
         $portdetails
         $portinfo += $portdetails
     }

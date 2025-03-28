@@ -1,0 +1,1 @@
+$dns1 = "<ip address>"; $dns2 = "<ipaddress>"; $prefix = "<prefix>"; Get-netadapter|Set-DnsClientServerAddress -ServerAddresses("$dns1","$dns2");$i = get-netadapter; Set-NetIPAddress -InterfaceIndex $i.interfaceindex  -PrefixLength $prefix
