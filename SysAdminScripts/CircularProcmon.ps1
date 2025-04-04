@@ -13,8 +13,7 @@ $Compressjob =  Start-job{
             $dest = $i.BaseName + ".zip"
             Compress-7zip -path $i.FullName -ArchiveFileName F:\Procmon\Archive\$dest -CompressionLevel Fast
             Remove-item $i.FullName
-            
-        }
+            }
         Start-sleep 10
     }while($h = 1)
 }
