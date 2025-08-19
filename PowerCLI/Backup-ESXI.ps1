@@ -1,6 +1,3 @@
-# This script initiates VMware PowerCLI
-. "C:\Program Files (x86)\VMware\Infrastructure\vSphere PowerCLI\Scripts\Initialize-PowerCLIEnvironment.ps1"
-#
 # Specify vCenter Server, vCenter Server prompts for username and vCenter Server user password
 $vCenter="vcenter.domain.local"
  
