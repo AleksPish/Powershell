@@ -1,9 +1,7 @@
 <# ----------------------------------------------- ABOUT ---------------------------------------------------------------------
 
 # TITLE: FSLogix Maintenance
-# CREATED BY:            
-#            Henry Gelderbloem, Henry.Gelderbloem@waterstons.com, Waterstons
-
+# 
 # DESCRIPTION: As configured by GPO, the disks created by FSLogix will be dynamically allocated as data is added to them. Dynamically expanding disks do not shrink when the amount of data inside decreases. 
 #              This script reduces the size of the disks by reclaiming whitespace.
 #              
