@@ -1,58 +1,201 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $false)]
+    [string]$SearchText,
 
-# Get the string we want to search for 
+    [Parameter(Mandatory = $false)]
+    [string]$DomainName = $env:USERDNSDOMAIN,
 
-$string = Read-Host -Prompt "What string do you want to search for?" 
+    [Parameter(Mandatory = $false)]
+    [switch]$UseRegex,
 
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(1, 50)]
+    [int]$MaxMatchesPerGpo = 3,
 
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(40, 1000)]
+    [int]$MaxLineLength = 180,
 
-# Set the domain to search for GPOs 
+    [Parameter(Mandatory = $false)]
+    [ValidateSet("GpoOnly", "WithText")]
+    [string]$DisplayMode,
 
-$DomainName = $env:USERDNSDOMAIN 
+    [Parameter(Mandatory = $false)]
+    [switch]$PassThru
+)
 
+if (-not $SearchText) {
+    $SearchText = Read-Host -Prompt "What string do you want to search for?"
+}
 
+if (-not $SearchText -or [string]::IsNullOrWhiteSpace($SearchText)) {
+    throw "Search text cannot be empty."
+}
 
-# Find all GPOs in the current domain 
+if (-not $DisplayMode) {
+    $displayChoice = Read-Host -Prompt "Display mode: type '1' for matching GPOs only, or '2' for matching GPOs with matched text"
+    switch ($displayChoice) {
+        "1" { $DisplayMode = "GpoOnly" }
+        "2" { $DisplayMode = "WithText" }
+        default { $DisplayMode = "GpoOnly" }
+    }
+}
 
-write-host "Finding all the GPOs in $DomainName" 
+if (-not $DomainName -or [string]::IsNullOrWhiteSpace($DomainName)) {
+    throw "Domain name is empty. Pass -DomainName explicitly."
+}
 
-#Import-Module grouppolicy 
+if (-not (Get-Module -ListAvailable -Name GroupPolicy)) {
+    throw "GroupPolicy module is not available on this system."
+}
 
-$allGposInDomain = Get-GPO -All -Domain $DomainName 
+Import-Module GroupPolicy -ErrorAction Stop
 
-[string[]] $MatchedGPOList = @()
+function Test-TextMatch {
+    param(
+        [string]$InputText,
+        [string]$SearchText,
+        [bool]$UseRegex
+    )
 
+    if ([string]::IsNullOrWhiteSpace($InputText)) {
+        return $false
+    }
 
+    if ($UseRegex) {
+        return ($InputText -match $SearchText)
+    }
 
-# Look through each GPO's XML for the string 
+    return ($InputText.IndexOf($SearchText, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
 
-Write-Host "Starting search...." 
+function Get-XmlNodePath {
+    param([System.Xml.XmlNode]$Node)
 
-foreach ($gpo in $allGposInDomain) { 
+    if ($null -eq $Node) { return "" }
 
-    $report = Get-GPOReport -Guid $gpo.Id -ReportType Xml 
+    $parts = @()
+    $current = $Node
+    while ($null -ne $current -and $current.NodeType -ne [System.Xml.XmlNodeType]::Document) {
+        $parts += $current.Name
+        $current = $current.ParentNode
+    }
 
-    if ($report -match $string) { 
+    [array]::Reverse($parts)
+    return "/" + ($parts -join "/")
+}
 
-        write-host "********** Match found in: $($gpo.DisplayName) **********" -foregroundcolor "Green"
+Write-Host ("Finding all GPOs in domain: {0}" -f $DomainName) -ForegroundColor Cyan
 
-        $MatchedGPOList += "$($gpo.DisplayName)";
+try {
+    $allGposInDomain = @(Get-GPO -All -Domain $DomainName -ErrorAction Stop)
+}
+catch {
+    throw ("Failed to enumerate GPOs in '{0}': {1}" -f $DomainName, $_.Exception.Message)
+}
 
-    } # end if 
+Write-Host ("Starting search across {0} GPO(s)..." -f $allGposInDomain.Count) -ForegroundColor Cyan
 
-    else { 
+$results = @()
+$errors = @()
 
-        Write-Host "No match in: $($gpo.DisplayName)" 
+foreach ($gpo in $allGposInDomain) {
+    try {
+        $report = Get-GPOReport -Guid $gpo.Id -ReportType Xml -Domain $DomainName -ErrorAction Stop
+        $xml = [xml]$report
+        $textNodes = $xml.SelectNodes("//*[text()]")
 
-    } # end else 
+        $addedCount = 0
+        foreach ($node in $textNodes) {
+            $textValue = [string]$node.InnerText
+            if (-not (Test-TextMatch -InputText $textValue -SearchText $SearchText -UseRegex $UseRegex)) {
+                continue
+            }
 
-} # end foreach
+            $preview = $textValue.Trim()
+            if ($preview.Length -gt $MaxLineLength) {
+                $preview = $preview.Substring(0, $MaxLineLength) + "..."
+            }
 
-write-host "`r`n"
+            $results += [pscustomobject]@{
+                Domain = $DomainName
+                GpoDisplayName = $gpo.DisplayName
+                GpoId = $gpo.Id
+                SearchText = $SearchText
+                MatchType = if ($UseRegex) { "Regex" } else { "Literal" }
+                MatchPath = Get-XmlNodePath -Node $node
+                MatchPreview = $preview
+                MatchText = $textValue
+            }
 
-write-host "Results: **************" -foregroundcolor "Yellow"
+            $addedCount++
+            if ($addedCount -ge $MaxMatchesPerGpo) {
+                break
+            }
+        }
 
-foreach ($match in $MatchedGPOList) { 
+        if ($addedCount -gt 0) {
+            Write-Verbose ("Match found in: {0}" -f $gpo.DisplayName)
+        }
+        else {
+            Write-Verbose ("No match in: {0}" -f $gpo.DisplayName)
+        }
+    }
+    catch {
+        $errors += [pscustomobject]@{
+            Domain = $DomainName
+            GpoDisplayName = $gpo.DisplayName
+            GpoId = $gpo.Id
+            Error = $_.Exception.Message
+        }
+    }
+}
 
-    write-host "Match found in: $($match)" -foregroundcolor "Green"
+Write-Host ""
+Write-Host "Matches" -ForegroundColor Yellow
+if ($results.Count -eq 0) {
+    Write-Host "No GPO matches found." -ForegroundColor Yellow
+}
+else {
+    if ($DisplayMode -eq "GpoOnly") {
+        $results |
+            Sort-Object GpoDisplayName |
+            Select-Object GpoDisplayName, GpoId -Unique |
+            Format-Table -AutoSize
+    }
+    else {
+        $results |
+            Select-Object GpoDisplayName, GpoId, MatchPath, MatchPreview |
+            Sort-Object GpoDisplayName, MatchPath |
+            Format-Table -AutoSize
+    }
 
-} 
+    $uniqueGpoCount = ($results | Select-Object -ExpandProperty GpoId -Unique).Count
+    Write-Host ("Total matching GPOs: {0}" -f $uniqueGpoCount) -ForegroundColor Green
+    Write-Host ("Total match lines shown: {0}" -f $results.Count) -ForegroundColor Green
+
+    if ($DisplayMode -eq "WithText") {
+        Write-Host ""
+        Write-Host "Detailed Match Text" -ForegroundColor Yellow
+        foreach ($match in ($results | Sort-Object GpoDisplayName, MatchPath)) {
+            Write-Host ("[{0}] {1}" -f $match.GpoDisplayName, $match.MatchPath) -ForegroundColor Cyan
+            Write-Host $match.MatchText
+            Write-Host ""
+        }
+    }
+}
+
+if ($errors.Count -gt 0) {
+    Write-Host ""
+    Write-Host "GPOs with errors" -ForegroundColor Red
+    $errors | Select-Object GpoDisplayName, Error | Format-Table -AutoSize
+    Write-Host ("Total errors: {0}" -f $errors.Count) -ForegroundColor Red
+}
+
+if ($PassThru) {
+    [pscustomobject]@{
+        Matches = $results
+        Errors = $errors
+    }
+}

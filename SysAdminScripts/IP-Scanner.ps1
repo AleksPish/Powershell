@@ -1,175 +1,209 @@
 <#
 .SYNOPSIS
-  Scan an IP range and report how many IPs are alive.
-  
+  Scan IP addresses and report reachable hosts.
+
 .DESCRIPTION
-  Uses Multi Threading and only 1 ping to accomplish the task faster. (Inspired by Angry IP SCanner)
-
-.PARAMETER <Parameter_Name>
-   In the top of the script, set your IP ranges. You can scan multiple ranges. Handy for corporate nets.
-	
-.INPUTS
-  None
-  
-.OUTPUTS
-  Text to Powershell Console
-  
-.NOTES
-
-         Version: 1.01
-          Author: Gordon Virasawmi
-          GitHub: https://github.com/GordonVi
-   Creation Date: 10/25/2019 @ 6:56pm
-  Purpose/Change: Initial script development
-         License: Free for all. Too simple to charge for. Too important to not publish.
-     Works Cited: Runspaces Simplified - https://blog.netnerds.net/2016/12/runspaces-simplified/
-
+  Uses runspaces for concurrent ping checks. Optional DNS and MAC lookups can
+  be enabled when needed.
 
 .EXAMPLE
-  .\ip_scan.ps1
-  
+  .\IP-Scanner.ps1 -SubnetPrefix 10.0.0 -StartHost 1 -EndHost 254
+
+.EXAMPLE
+  .\IP-Scanner.ps1 -IPList 10.0.0.5,10.0.0.10 -ResolveDns -ResolveMac
 #>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(1, 2048)]
+    [int]$Threads = 256,
 
-# --------------------------------------------------
+    [Parameter(Mandatory = $false)]
+    [ValidateNotNullOrEmpty()]
+    [string]$SubnetPrefix,
 
-$threads = 1000 # how many simultanious threads. I've tested up to 1000 ok against ~3600 local IPs, ~900 active.
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(1, 254)]
+    [int]$StartHost = 1,
 
-$list = for ($a=1; $a -le 255; $a++) # set the last octlet range
-			{
-				"10.0.0.$a" # set the first 3 octlets.
-			}
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(1, 254)]
+    [int]$EndHost = 254,
 
-# --------------------------------------------------
-	
-clear
+    [Parameter(Mandatory = $false)]
+    [string[]]$IPList,
 
-""
-write-host "       Threads: " -nonewline -foregroundcolor yellow
-$threads
-"    Build Pool: "
-"    Drain Pool: "
-" ---------------------"
-write-host "   Total Hosts: $($list.count)"
-write-host "   Alive Hosts: "
-write-host "    Dead Hosts: "
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(100, 5000)]
+    [int]$TimeoutMs = 800,
 
+    [Parameter(Mandatory = $false)]
+    [switch]$ResolveDns,
 
-# BLOCK 1: Create and open runspace pool, setup runspaces array with min and max threads
-$pool = [RunspaceFactory]::CreateRunspacePool(1, $threads)
-$pool.ApartmentState = "MTA"
-$pool.Open()
-$runspaces = $results = @()
+    [Parameter(Mandatory = $false)]
+    [switch]$ResolveMac,
 
-# --------------------------------------------------
-    
-# BLOCK 2: Create reusable scriptblock. This is the workhorse of the runspace. Think of it as a function.
-$scriptblock = {
-    Param (
-    [string]$ip
+    [Parameter(Mandatory = $false)]
+    [switch]$ShowDeadHosts,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$NoProgress
+)
+
+if (-not $IPList -or $IPList.Count -eq 0) {
+    if (-not $SubnetPrefix -or [string]::IsNullOrWhiteSpace($SubnetPrefix)) {
+        $SubnetPrefix = Read-Host -Prompt "Enter subnet prefix to scan (example: 10.0.0 for /24)"
+    }
+
+    if (-not $SubnetPrefix -or [string]::IsNullOrWhiteSpace($SubnetPrefix)) {
+        throw "SubnetPrefix cannot be empty when -IPList is not provided."
+    }
+
+    if ($StartHost -gt $EndHost) {
+        throw "StartHost cannot be greater than EndHost."
+    }
+
+    $IPList = for ($i = $StartHost; $i -le $EndHost; $i++) {
+        "{0}.{1}" -f $SubnetPrefix, $i
+    }
+}
+$IPList = @($IPList)
+if ($IPList.Count -eq 1 -and $IPList[0] -is [string] -and $IPList[0].Contains(",")) {
+    $IPList = @($IPList[0].Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
+Write-Host ""
+Write-Host ("IP Scanner - Targets: {0} | Threads: {1} | Timeout: {2}ms" -f $IPList.Count, $Threads, $TimeoutMs) -ForegroundColor Cyan
+Write-Host ("DNS Lookup: {0} | MAC Lookup: {1}" -f $ResolveDns.IsPresent, $ResolveMac.IsPresent) -ForegroundColor DarkCyan
+
+$pool = $null
+$runspaces = New-Object System.Collections.ArrayList
+$results = New-Object System.Collections.Generic.List[object]
+
+$scriptBlock = {
+    param(
+        [string]$IpAddress,
+        [int]$TimeoutMs,
+        [bool]$ResolveDns,
+        [bool]$ResolveMac
     )
 
-	$ping=$(Test-Connection -ComputerName $ip -Count 1).scope.isconnected
-	if ($ping -eq "true") {
-	
-							$DNS=([System.Net.Dns]::GetHostByAddress($ip)).Hostname
-							#$mac=$($(arp -a $ip)[3]).Split(" ",[System.StringSplitOptions]::RemoveEmptyEntries)[1]
-							$mac=$(get-netneighbor -ipaddress $ip).LinkLayerAddress
-							
-							} else {
+    $isAlive = $false
+    $dnsName = $null
+    $macAddress = $null
+    $roundTripMs = $null
+    $errorText = $null
 
-							$DNS=""
-							$mac=""
-							}
-       
-    # return whatever you want, or don't.
-    return [pscustomobject][ordered]@{
-								ip 		= $ip
-								ping 	= $ping
-								DNS		= $DNS
-								MAC		= $mac
-							} 
+    try {
+        $pinger = New-Object System.Net.NetworkInformation.Ping
+        $reply = $pinger.Send($IpAddress, $TimeoutMs)
+        if ($reply -and $reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
+            $isAlive = $true
+            $roundTripMs = [int]$reply.RoundtripTime
+        }
+    }
+    catch {
+        $errorText = $_.Exception.Message
+    }
+
+    if ($isAlive -and $ResolveDns) {
+        try {
+            $dnsName = ([System.Net.Dns]::GetHostEntry($IpAddress)).HostName
+        }
+        catch {}
+    }
+
+    if ($isAlive -and $ResolveMac) {
+        try {
+            if (Get-Command -Name Get-NetNeighbor -ErrorAction SilentlyContinue) {
+                $neighbor = Get-NetNeighbor -IPAddress $IpAddress -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($neighbor) {
+                    $macAddress = $neighbor.LinkLayerAddress
+                }
+            }
+        }
+        catch {}
+    }
+
+    [pscustomobject]@{
+        IP = $IpAddress
+        Alive = $isAlive
+        RoundTripMs = $roundTripMs
+        DNS = $dnsName
+        MAC = $macAddress
+        Error = $errorText
+    }
 }
 
-# --------------------------------------------------
- 
-# BLOCK 3: Create runspace and add to runspace pool
-$counter=0
-foreach ($ip in $list) {
- 
-    $runspace = [PowerShell]::Create()
-    $null = $runspace.AddScript($scriptblock)
-    $null = $runspace.AddArgument($ip)
+try {
+    $pool = [RunspaceFactory]::CreateRunspacePool(1, $Threads)
+    $pool.ApartmentState = "MTA"
+    $pool.Open()
 
-    $runspace.RunspacePool = $pool
- 
-# BLOCK 4: Add runspace to runspaces collection and "start" it
-    # Asynchronously runs the commands of the PowerShell object pipeline
-    $runspaces += [PSCustomObject]@{ Pipe = $runspace; Status = $runspace.BeginInvoke() }
+    foreach ($ip in $IPList) {
+        $ps = [PowerShell]::Create()
+        $null = $ps.AddScript($scriptBlock).AddArgument($ip).AddArgument($TimeoutMs).AddArgument($ResolveDns.IsPresent).AddArgument($ResolveMac.IsPresent)
+        $ps.RunspacePool = $pool
 
-	$Host.UI.RawUI.CursorPosition = New-Object System.Management.Automation.Host.Coordinates 16 , 2
-	$counter++
-	write-host "$counter " -nonewline
+        $handle = $ps.BeginInvoke()
+        $null = $runspaces.Add([pscustomobject]@{
+            PowerShell = $ps
+            Handle = $handle
+        })
+    }
+
+    $completed = 0
+    $total = $runspaces.Count
+
+    foreach ($job in $runspaces) {
+        try {
+            $output = $job.PowerShell.EndInvoke($job.Handle)
+            foreach ($item in $output) {
+                $results.Add($item) | Out-Null
+            }
+        }
+        finally {
+            $job.PowerShell.Dispose()
+            $completed++
+            if (-not $NoProgress) {
+                $pct = [int](($completed / $total) * 100)
+                Write-Progress -Activity "Scanning IP range" -Status ("Processed {0}/{1}" -f $completed, $total) -PercentComplete $pct
+            }
+        }
+    }
+}
+finally {
+    if ($pool) {
+        $pool.Close()
+        $pool.Dispose()
+    }
+    if (-not $NoProgress) {
+        Write-Progress -Activity "Scanning IP range" -Completed
+    }
 }
 
-# --------------------------------------------------
- 
-# BLOCK 5: Wait for runspaces to finish
+$allResults = @($results | Sort-Object IP)
+$aliveResults = @($allResults | Where-Object { $_.Alive })
+$deadResults = @($allResults | Where-Object { -not $_.Alive })
 
-<#
+Write-Host ""
+Write-Host ("Total Hosts: {0}" -f $allResults.Count) -ForegroundColor Cyan
+Write-Host ("Alive Hosts: {0}" -f $aliveResults.Count) -ForegroundColor Green
+Write-Host ("Dead Hosts:  {0}" -f $deadResults.Count) -ForegroundColor Red
+Write-Host ""
 
-do {
-
-	$Host.UI.RawUI.CursorPosition = New-Object System.Management.Automation.Host.Coordinates 5 , 9
-	$cnt = ($runspaces | Where {$_.Result.IsCompleted -ne $true}).Count
-	write-host "$cnt   "
-	
-	} while ($cnt -gt 0)
-
-#>
-
-# --------------------------------------------------
-
-$total=$counter
-$counter=0
-
-# BLOCK 6: Clean up
-foreach ($runspace in $runspaces ) {
-    # EndInvoke method retrieves the results of the asynchronous call
-    $results += $runspace.Pipe.EndInvoke($runspace.Status)
-    $runspace.Pipe.Dispose()
-	
-	$Host.UI.RawUI.CursorPosition = New-Object System.Management.Automation.Host.Coordinates 16 , 3
-	$counter++
-	write-host "$($total-$counter) " -nonewline
-
+if ($ShowDeadHosts) {
+    $allResults |
+        Select-Object IP, Alive, RoundTripMs, DNS, MAC, Error |
+        Format-Table -AutoSize
 }
-    
-$pool.Close() 
-$pool.Dispose()
-
-# --------------------------------------------------
- 
-# Bonus block 7
-# Look at $results to see any errors or whatever was returned from the runspaces
-
-# Use this to output to JSON. CSV works too since it's simple data.
-# $results | convertto-json -depth 10 > ip_scan.json
-
-$total=$results.count
-$alive = $($results | ? {$_.ping -eq "true"}).count
-$dead = $($results | ? {$_.ping -ne "true"}).count
-
-$Host.UI.RawUI.CursorPosition = New-Object System.Management.Automation.Host.Coordinates 0 , 5
-
-write-host "   Total Hosts: " -nonewline -foregroundcolor cyan
-$total
-
-write-host "   Alive Hosts: " -nonewline -foregroundcolor green
-$alive
-
-write-host "    Dead Hosts: " -nonewline -foregroundcolor red
-$dead
-
-""
-
-$results | ? {$_.ping -eq "true"} | select ip,DNS,MAC
+else {
+    if ($aliveResults.Count -eq 0) {
+        Write-Host "No reachable hosts found." -ForegroundColor Yellow
+    }
+    else {
+        $aliveResults |
+            Select-Object IP, RoundTripMs, DNS, MAC |
+            Format-Table -AutoSize
+    }
+}
