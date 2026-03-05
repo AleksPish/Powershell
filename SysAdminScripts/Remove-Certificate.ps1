@@ -1,68 +1,154 @@
-#######################################
-#/-----------------------------------\#
-#|Aleks Piszczynski - piszczynski.com|#
-#\-----------------------------------/#
-#######################################
-<#
-.Synopsis
-   Find certs using thumbprint and delete
-#>
-#For running against all servers in domain:
-$Servers = get-ADComputer -Filter 'operatingsystem -like "*server*" -and enabled -eq "true"' | Select-Object -expandproperty name
- 
-# Input file
-#$Servers = Get-Content "C:\temp\servers.txt"
-#For local machine:
-#$servers = $env:COMPUTERNAME
-$ErrorActionPreference = 'Stop'
- 
-# Searching phrase
-$thumbprint = Read-Host "Enter the certificate thumbprint for the certificate to delete"
-
-
+Set-StrictMode -Version Latest
 
 function Remove-Certificate {
-    param (
-        $thumbprint,
-        $Servers
-    )
-    
+  <#
+  .SYNOPSIS
+  Removes a certificate (by thumbprint) from Cert:\LocalMachine\My on one or more computers.
 
-# Looping each server 
-foreach($Server in $Servers)
-{   
-    Write-Host Processing $Server -ForegroundColor yellow
-     
-    Try
-    {
-        # Checking hostname of a server provided in input file 
-        $hostname = ([System.Net.Dns]::GetHostByName("$Server")).hostname
-   
-        # Querying for certificates on remote server
-        $Certs = Invoke-Command $Server -ScriptBlock{ Get-ChildItem Cert:\LocalMachine\My }
-        #To run on local machine:
-        #$Certs = Get-ChildItem Cert:\LocalMachine\My 
+  .DESCRIPTION
+  Removes certificates from the LocalMachine\My store on remote computers via PowerShell remoting.
+  Supports -WhatIf and -Confirm for safer execution.
+
+  .PARAMETER Thumbprint
+  Certificate thumbprint to remove. Spaces are ignored.
+
+  .PARAMETER ComputerName
+  One or more target computers. If omitted, uses the local computer.
+
+  .PARAMETER ServerListPath
+  Path to a text file containing one computer name per line.
+
+  .PARAMETER UseActiveDirectory
+  Queries Active Directory for enabled server OS computer accounts when no explicit targets are supplied.
+
+  .EXAMPLE
+  Remove-Certificate -Thumbprint 'ABCD1234...' -ComputerName SRV01,SRV02 -Confirm
+
+  .EXAMPLE
+  Remove-Certificate -Thumbprint 'ABCD1234...' -ServerListPath C:\Temp\servers.txt -WhatIf
+
+  .EXAMPLE
+  Remove-Certificate -Thumbprint 'ABCD1234...' -UseActiveDirectory
+
+  .OUTPUTS
+  PSCustomObject
+  #>
+  [CmdletBinding(SupportsShouldProcess=$true, ConfirmImpact='High')]
+  param(
+    [Parameter(Mandatory=$true)]
+    [ValidatePattern('^[A-Fa-f0-9 ]{40,}$')]
+    [string]$Thumbprint,
+
+    [Parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+    [Alias('Server', 'Name')]
+    [string[]]$ComputerName,
+
+    [ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })]
+    [string]$ServerListPath,
+
+    [switch]$UseActiveDirectory
+  )
+
+  begin {
+    $normalizedThumbprint = ($Thumbprint -replace '\s', '').ToUpperInvariant()
+    if ($normalizedThumbprint.Length -ne 40) {
+      throw "Thumbprint must resolve to 40 hexadecimal characters. Received '$normalizedThumbprint' ($($normalizedThumbprint.Length) chars)."
     }
-    Catch
-    {
-        $_.Exception.Message
-        Continue
-    }
-      
-    If($hostname -and $Certs)
-    {
-        $deleteCerts = ($Certs | where-object {$_.Thumbprint -eq "$thumbprint"})
-        Foreach($Cert in $deleteCerts)
-        {
-            $Cert | Remove-Item
-            Write-host "$Cert Removed"
+
+    $targets = New-Object System.Collections.Generic.List[string]
+  }
+
+  process {
+    if ($ComputerName) {
+      foreach ($name in $ComputerName) {
+        if (-not [string]::IsNullOrWhiteSpace($name)) {
+          $targets.Add($name.Trim())
         }
-    } 
-    Else
-    {
-        Write-Warning "An Error has occurred!"
+      }
     }
-}
+  }
+
+  end {
+    if ($ServerListPath) {
+      Get-Content -LiteralPath $ServerListPath -ErrorAction Stop |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { $targets.Add($_.Trim()) }
+    }
+
+    if ($UseActiveDirectory -and $targets.Count -eq 0) {
+      if (-not (Get-Command Get-ADComputer -ErrorAction SilentlyContinue)) {
+        throw 'UseActiveDirectory was specified, but Get-ADComputer is unavailable. Install/import the ActiveDirectory module.'
+      }
+
+      $adTargets = Get-ADComputer -Filter 'operatingsystem -like "*server*" -and enabled -eq "true"' -ErrorAction Stop |
+        Select-Object -ExpandProperty Name
+
+      foreach ($name in $adTargets) {
+        if (-not [string]::IsNullOrWhiteSpace($name)) {
+          $targets.Add($name.Trim())
+        }
+      }
+    }
+
+    if ($targets.Count -eq 0) {
+      $targets.Add($env:COMPUTERNAME)
+      Write-Verbose "No targets supplied. Defaulting to local computer '$env:COMPUTERNAME'."
+    }
+
+    $uniqueTargets = $targets.ToArray() | Sort-Object -Unique
+
+    foreach ($target in $uniqueTargets) {
+      Write-Verbose "Processing '$target'."
+      if (-not $PSCmdlet.ShouldProcess($target, "Remove certificate thumbprint $normalizedThumbprint from LocalMachine\\My")) {
+        continue
+      }
+
+      try {
+        $result = Invoke-Command -ComputerName $target -ScriptBlock {
+          param([string]$RemoteThumbprint)
+
+          $matches = Get-ChildItem -LiteralPath 'Cert:\LocalMachine\My' -ErrorAction Stop |
+            Where-Object { $_.Thumbprint -eq $RemoteThumbprint }
+
+          if (-not $matches) {
+            return [PSCustomObject]@{
+              ComputerName = $env:COMPUTERNAME
+              Thumbprint   = $RemoteThumbprint
+              RemovedCount = 0
+              Removed      = @()
+            }
+          }
+
+          $removed = foreach ($cert in $matches) {
+            $item = [PSCustomObject]@{
+              Subject   = $cert.Subject
+              Thumbprint = $cert.Thumbprint
+              NotAfter  = $cert.NotAfter
+            }
+
+            Remove-Item -LiteralPath $cert.PSPath -Force -ErrorAction Stop
+            $item
+          }
+
+          [PSCustomObject]@{
+            ComputerName = $env:COMPUTERNAME
+            Thumbprint   = $RemoteThumbprint
+            RemovedCount = @($removed).Count
+            Removed      = @($removed)
+          }
+        } -ArgumentList $normalizedThumbprint -ErrorAction Stop
+
+        $result
+      }
+      catch {
+        Write-Error "[$target] Failed to remove certificate $normalizedThumbprint. $($_.Exception.Message)"
+      }
+    }
+  }
 }
 
-Remove-Certificate $thumbprint $Servers
+$isDotSourced = $MyInvocation.InvocationName -eq '.'
+if (-not $isDotSourced) {
+  $interactiveThumbprint = Read-Host 'Enter the certificate thumbprint for the certificate to delete'
+  Remove-Certificate -Thumbprint $interactiveThumbprint -UseActiveDirectory
+}
