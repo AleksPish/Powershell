@@ -1,0 +1,80 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "blocks": [
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "segments": [
+        {
+          "properties": {
+            "cache_duration": "none"
+          },
+          "template": " {{ if .WSL }}WSL at {{ end }}{{ .Icon }} \ue0b1",
+          "foreground": "#0b96a8",
+          "type": "os",
+          "style": "plain"
+        },
+        {
+          "properties": {
+            "cache_duration": "none"
+          },
+          "template": " \uf0e7 ",
+          "foreground": "#0ac6df",
+          "type": "root",
+          "style": "plain"
+        },
+        {
+          "properties": {
+            "cache_duration": "none",
+            "style": "full"
+          },
+          "template": " {{ .Path }} ",
+          "foreground": "#24c6db",
+          "type": "path",
+          "style": "plain"
+        },
+        {
+          "properties": {
+            "cache_duration": "none",
+            "fetch_stash_count": true,
+            "fetch_status": true,
+            "fetch_upstream_icon": true
+          },
+          "template": "<#26C6DA>\ue0b1 </>{{ if or (.Working.Changed) (.Staging.Changed) }}<#FFEB3B>{{ else if or (gt .Ahead 0) (gt .Behind 0) }}<#B388FF>{{ else }}<#4CAF50>{{ end }}{{ .HEAD }}</>{{ if .Staging.Changed }} +{{ .Staging.String }}{{ end }}{{ if .Working.Changed }} ~{{ .Working.String }}{{ end }}{{ if gt .StashCount 0 }} \uf692 {{ .StashCount }}{{ end }}{{ if gt .Ahead 0 }} \u2191{{ .Ahead }}{{ end }}{{ if gt .Behind 0 }} \u2193{{ .Behind }}{{ end }} ",
+          "type": "git",
+          "style": "plain"
+        },
+        {
+          "properties": {
+            "cache_duration": "none"
+          },
+          "template": " \ue0b1",
+          "foreground": "#24c6db",
+          "type": "text",
+          "style": "plain"
+        }
+      ]
+    },
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "segments": [
+        {
+          "properties": {
+            "always_enabled": true,
+            "cache_duration": "none"
+          },
+          "template": "\ue0b1 ",
+          "foreground": "#D4E157",
+          "type": "exit",
+          "style": "plain",
+          "foreground_templates": [
+            "{{ if gt .Code 0 }}#FF5252{{ end }}"
+          ]
+        }
+      ],
+      "newline": true
+    }
+  ],
+  "version": 3
+}
