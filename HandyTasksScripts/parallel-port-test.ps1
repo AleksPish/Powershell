@@ -312,7 +312,7 @@ function Invoke-ParallelPortTest {
             }
 
             if ($completedRunspaces.Count -gt 0) {
-                $remaining = $runspaces | Where-Object { -not $_.Handle.IsCompleted }
+                $remaining = $runspaces | Where-Object { $_ -notin $completedRunspaces }
                 $runspaces = [System.Collections.Generic.List[object]]::new()
                 foreach ($item in $remaining) {
                     $runspaces.Add($item)
